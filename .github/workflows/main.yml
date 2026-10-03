@@ -37,7 +37,8 @@ jobs:
             --ks-key-alias androiddebugkey --key-pass pass:android \
             --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
             --out AutoReply.apk aligned.apk
-          "$BT/apksigner" verify -v --print-certs AutoReply.apk
+          "$BT/apksigner" verify -v --print-certs AutoReply.apk | tee verify.txt
+          grep -q "v2 scheme (APK Signature Scheme v2): true" verify.txt
 
       - uses: actions/upload-artifact@v4
         with:
