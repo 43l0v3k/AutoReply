@@ -4,6 +4,16 @@ plugins {
 }
 
 android {
+signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+            enableV1Signing = true
+            enableV2Signing = true
+        }
+    }
     namespace = "com.example.autoreply"
     compileSdk = 36
 
