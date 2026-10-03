@@ -35,13 +35,17 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
+          echo "::notice::lengths b64=${#KEYSTORE_BASE64} pass=${#KEYSTORE_PASSWORD} alias=${#KEY_ALIAS}"
+          echo "::notice::apk files: $(ls app/build/outputs/apk/release/ 2>&1 | tr '\n' ' ')"
           echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+          echo "::notice::keystore bytes: $(stat -c %s release.keystore)"
           BT=$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)
-          "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          echo "::notice::build-tools: $BT"
+          "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk || { echo "::error::zipalign failed"; exit 1; }
           "$BT/apksigner" sign --ks release.keystore --ks-pass env:KEYSTORE_PASSWORD \
             --ks-key-alias "$KEY_ALIAS" --key-pass env:KEYSTORE_PASSWORD \
             --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
-            --out AutoReply-release.apk aligned.apk
+            --out AutoReply-release.apk aligned.apk 2> sign_err.txt || { echo "::error::apksigner failed: $(head -c 400 sign_err.txt | tr '\n' ' ')"; exit 1; }
           "$BT/apksigner" verify -v --print-certs AutoReply-release.apk
           rm release.keystore
 
