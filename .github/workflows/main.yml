@@ -26,33 +26,29 @@ jobs:
         with:
           gradle-version: 8.11.1
 
-      - name: Build debug APK
-        run: gradle assembleDebug --no-daemon
+      - name: Build release APK
+        run: gradle assembleRelease --no-daemon
 
-      - name: Sign APK and write report
+      - name: Sign release APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
           BT=$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)
-          "$BT/zipalign" -f -p 4 app/build/outputs/apk/debug/app-debug.apk aligned.apk
-          "$BT/apksigner" sign --ks debug.keystore --ks-pass pass:android \
-            --ks-key-alias androiddebugkey --key-pass pass:android \
+          "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          "$BT/apksigner" sign --ks release.keystore --ks-pass env:KEYSTORE_PASSWORD \
+            --ks-key-alias "$KEY_ALIAS" --key-pass env:KEYSTORE_PASSWORD \
             --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
-            --out AutoReply.apk aligned.apk
-          {
-            echo "== apksigner verify =="
-            "$BT/apksigner" verify -v --print-certs AutoReply.apk || true
-            echo
-            echo "== aapt2 badging =="
-            "$BT/aapt2" dump badging AutoReply.apk | head -3
-            echo
-            echo "== META-INF =="
-            unzip -l AutoReply.apk | grep META-INF
-          } > verify.txt 2>&1
-          cat verify.txt
+            --out AutoReply-release.apk aligned.apk
+          "$BT/apksigner" verify -v --print-certs AutoReply-release.apk
+          rm release.keystore
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AutoReply
-          path: AutoReply.apk
+          name: AutoReply-release
+          path: AutoReply-release.apk
 
       - name: Publish to latest release
         uses: softprops/action-gh-release@v2
@@ -60,9 +56,4 @@ jobs:
           tag_name: latest
           name: Latest build
           prerelease: true
-          body_path: verify.txt
-          files: AutoReply.apk
-
-      - name: Check v2 present
-        run: |
-          grep -q "v2 scheme (APK Signature Scheme v2): true" verify.txt
+          files: AutoReply-release.apk
