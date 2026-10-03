@@ -7,6 +7,7 @@ import android.provider.Settings
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -70,8 +71,9 @@ class MainActivity : Activity() {
         root.addView(View(this), LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
         ))
+        val version = packageManager.getPackageInfo(packageName, 0).versionName ?: ""
         root.addView(TextView(this).apply {
-            text = "v" + packageManager.getPackageInfo(packageName, 0).versionName
+            text = "v$version"
             gravity = Gravity.CENTER
         })
 
