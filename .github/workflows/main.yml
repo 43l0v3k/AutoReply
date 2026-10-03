@@ -2,7 +2,11 @@ name: Build APK
 
 on:
   push:
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -25,7 +29,25 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
 
+      - name: Sign APK (v2)
+        run: |
+          BT=$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)
+          "$BT/zipalign" -f -p 4 app/build/outputs/apk/debug/app-debug.apk aligned.apk
+          "$BT/apksigner" sign --ks debug.keystore --ks-pass pass:android \
+            --ks-key-alias androiddebugkey --key-pass pass:android \
+            --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
+            --out AutoReply.apk aligned.apk
+          "$BT/apksigner" verify -v --print-certs AutoReply.apk
+
       - uses: actions/upload-artifact@v4
         with:
-          name: AutoReply-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: AutoReply
+          path: AutoReply.apk
+
+      - name: Publish to latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest build
+          prerelease: true
+          files: AutoReply.apk
