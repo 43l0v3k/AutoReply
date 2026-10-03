@@ -73,7 +73,8 @@ class AutoReplyService : NotificationListenerService() {
             "com.whatsapp",
             "com.whatsapp.w4b",
             "com.viber.voip",
-            "com.vkontakte.android"
+            "com.vkontakte.android",
+            "ru.oneme.app"
         )
     }
 }
