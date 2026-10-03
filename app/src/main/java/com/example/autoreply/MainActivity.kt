@@ -73,7 +73,7 @@ class MainActivity : Activity() {
         ))
         val version = packageManager.getPackageInfo(packageName, 0).versionName ?: ""
         root.addView(TextView(this).apply {
-            text = "v$version"
+            text = "v$version · 43l0v3k"
             gravity = Gravity.CENTER
         })
 
