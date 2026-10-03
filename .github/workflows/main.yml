@@ -64,4 +64,5 @@ jobs:
           files: AutoReply.apk
 
       - name: Check v2 present
-        run: grep -q "v2 scheme (APK Signature Scheme v2): true" verify.txt
+        run: |
+          grep -q "v2 scheme (APK Signature Scheme v2): true" verify.txt
