@@ -18,7 +18,7 @@ signingConfigs {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.autoreply"
+        applicationId = "com.x43l0v3k.autoreply"
         minSdk = 24
         targetSdk = 36
         versionCode = 2
