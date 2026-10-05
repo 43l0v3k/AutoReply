@@ -13,10 +13,15 @@ class AutoReplyService : NotificationListenerService() {
 
     private val lastReply = HashMap<String, Long>()
 
+    override fun onListenerConnected() {
+        Notifier.update(this)
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val prefs = Prefs(this)
         if (!prefs.enabled) return
-        if (sbn.packageName !in TARGETS) return
+        val app = Apps.byPackage(sbn.packageName) ?: return
+        if (!prefs.isAppOn(app.title)) return
 
         val n = sbn.notification
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
@@ -39,7 +44,11 @@ class AutoReplyService : NotificationListenerService() {
         if (now - last < prefs.cooldownMin * 60_000L) return
         lastReply[key] = now
 
-        sendReply(action, prefs.replyText)
+        if (sendReply(action, prefs.replyText)) {
+            prefs.count = prefs.count + 1
+            prefs.addJournal(app.title, title)
+            Notifier.update(this)
+        }
     }
 
     private fun findReplyAction(n: Notification): Notification.Action? {
@@ -49,8 +58,8 @@ class AutoReplyService : NotificationListenerService() {
             ?: withInput.firstOrNull()
     }
 
-    private fun sendReply(action: Notification.Action, text: String) {
-        try {
+    private fun sendReply(action: Notification.Action, text: String): Boolean {
+        return try {
             val inputs = action.remoteInputs
             val intent = Intent()
             val bundle = Bundle()
@@ -59,22 +68,14 @@ class AutoReplyService : NotificationListenerService() {
             }
             RemoteInput.addResultsToIntent(inputs, intent, bundle)
             action.actionIntent.send(this, 0, intent)
+            true
         } catch (e: PendingIntent.CanceledException) {
             Log.e(TAG, "reply failed", e)
+            false
         }
     }
 
     companion object {
         private const val TAG = "AutoReply"
-
-        val TARGETS = setOf(
-            "org.telegram.messenger",
-            "org.telegram.messenger.web",
-            "com.whatsapp",
-            "com.whatsapp.w4b",
-            "com.viber.voip",
-            "com.vkontakte.android",
-            "ru.oneme.app"
-        )
     }
 }
