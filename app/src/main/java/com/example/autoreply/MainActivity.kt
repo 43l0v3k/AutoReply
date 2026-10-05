@@ -89,3 +89,100 @@ class MainActivity : Activity() {
 
         root.addView(label("Шаблоны: нажми, чтобы применить. Удерживай, чтобы сохранить в шаблон текст из поля выше"))
         for (i in 0 until Prefs.TEMPLATE_COUNT) {
+            val btn = Button(this)
+            btn.isAllCaps = false
+            btn.text = prefs.template(i)
+            btn.setOnClickListener { textInput.setText(prefs.template(i)) }
+            btn.setOnLongClickListener {
+                val t = textInput.text.toString()
+                if (t.isNotBlank()) {
+                    prefs.setTemplate(i, t)
+                    btn.text = t
+                    Toast.makeText(this, "Шаблон сохранён", Toast.LENGTH_SHORT).show()
+                }
+                true
+            }
+            root.addView(btn)
+        }
+
+        root.addView(label("Не отвечать одному человеку чаще, чем раз в N минут"))
+        root.addView(cooldownInput)
+
+        root.addView(Button(this).apply {
+            text = "Настройки"
+            setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
+        })
+
+        root.addView(Button(this).apply {
+            text = "Журнал ответов"
+            setOnClickListener { startActivity(Intent(this@MainActivity, JournalActivity::class.java)) }
+        })
+
+        root.addView(TextView(this).apply {
+            text = "WhatsApp и Instagram — продукты компании Meta, признанной экстремистской в РФ и запрещённой на территории России."
+            textSize = 12f
+            setTextColor(Color.GRAY)
+            setPadding(0, pad, 0, 0)
+        })
+
+        root.addView(TextView(this).apply {
+            val version = packageManager.getPackageInfo(packageName, 0).versionName
+            val sb = SpannableStringBuilder("v$version · 43l0v3k · ")
+            fun link(label: String, url: String) {
+                val start = sb.length
+                sb.append(label)
+                sb.setSpan(URLSpan(url), start, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            link("GitHub", GITHUB_URL)
+            if (RUSTORE_URL.isNotBlank()) {
+                sb.append(" · ")
+                link("RuStore", RUSTORE_URL)
+            }
+            text = sb
+            movementMethod = LinkMovementMethod.getInstance()
+            gravity = Gravity.CENTER
+            setPadding(0, pad * 2, 0, pad)
+        })
+
+        setContentView(ScrollView(this).apply {
+            fitsSystemWindows = true
+            addView(root)
+        })
+    }
+
+    private fun askNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        Notifier.update(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val granted = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
+            ?.contains(packageName) == true
+        status.text = if (granted) "Доступ к уведомлениям: есть" else "Доступ к уведомлениям: нет, выдай"
+        if (mainSwitch.isChecked != prefs.enabled) mainSwitch.isChecked = prefs.enabled
+        Notifier.update(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        prefs.replyText = textInput.text.toString().ifBlank { Prefs.DEFAULT_TEXT }
+        prefs.cooldownMin = cooldownInput.text.toString().toIntOrNull()?.coerceAtLeast(1) ?: 60
+    }
+
+    companion object {
+        const val GITHUB_URL = "https://github.com/43l0v3k/AutoReply"
+        // ссылку на RuStore вставь сюда после модерации
+        const val RUSTORE_URL = ""
+    }
+}
