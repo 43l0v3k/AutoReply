@@ -16,7 +16,7 @@ object Notifier {
     fun update(ctx: Context) {
         val prefs = Prefs(ctx)
         val nm = NotificationManagerCompat.from(ctx)
-        if (!prefs.enabled) {
+                if (!prefs.enabled || !prefs.showNotification) {
             nm.cancel(ID)
             return
         }
