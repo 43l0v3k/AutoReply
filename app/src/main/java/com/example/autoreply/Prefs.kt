@@ -30,6 +30,14 @@ class Prefs(context: Context) {
         get() = sp.getInt("count", 0)
         set(v) = sp.edit().putInt("count", v).apply()
 
+            // связка с «Не беспокоить» (по умолчанию включена)
+    var dndLink: Boolean
+        get() = sp.getBoolean("dnd_link", true)
+        set(v) = sp.edit().putBoolean("dnd_link", v).apply()
+
+    var showNotification: Boolean
+        get() = sp.getBoolean("show_notification", true)
+        set(v) = sp.edit().putBoolean("show_notification", v).apply()
     // приложения
     private var disabledApps: Set<String>
         get() = sp.getStringSet("disabled_apps", emptySet()) ?: emptySet()
