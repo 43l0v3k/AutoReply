@@ -14,7 +14,34 @@ class AutoReplyService : NotificationListenerService() {
     private val lastReply = HashMap<String, Long>()
 
     override fun onListenerConnected() {
+        instance = this
         Notifier.update(this)
+    }
+
+    override fun onListenerDisconnected() {
+        if (instance === this) instance = null
+    }
+
+    // включился или выключился «Не беспокоить»
+    override fun onInterruptionFilterChanged(interruptionFilter: Int) {
+        val prefs = Prefs(this)
+        if (!prefs.dndLink) return
+        if (interruptionFilter == INTERRUPTION_FILTER_UNKNOWN) return
+        val dnd = interruptionFilter != INTERRUPTION_FILTER_ALL
+        if (dnd != prefs.enabled) {
+            Controller.setEnabled(this, dnd, fromDnd = true)
+        }
+    }
+
+    // переключили AutoReply - переключаем «Не беспокоить»
+    fun syncDnd(on: Boolean) {
+        try {
+            val isDnd = currentInterruptionFilter != INTERRUPTION_FILTER_ALL
+            if (on && !isDnd) requestInterruptionFilter(INTERRUPTION_FILTER_PRIORITY)
+            if (!on && isDnd) requestInterruptionFilter(INTERRUPTION_FILTER_ALL)
+        } catch (e: Exception) {
+            Log.e(TAG, "dnd sync failed", e)
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -48,6 +75,7 @@ class AutoReplyService : NotificationListenerService() {
             prefs.count = prefs.count + 1
             prefs.addJournal(app.title, title)
             Notifier.update(this)
+            AutoReplyWidget.refresh(this)
         }
     }
 
@@ -77,5 +105,8 @@ class AutoReplyService : NotificationListenerService() {
 
     companion object {
         private const val TAG = "AutoReply"
+
+        @Volatile
+        var instance: AutoReplyService? = null
     }
 }
