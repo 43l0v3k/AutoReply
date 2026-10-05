@@ -21,8 +21,8 @@ signingConfigs {
         applicationId = "com.x43l0v3k.autoreply"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.1.0"
     }
 
     compileOptions {
