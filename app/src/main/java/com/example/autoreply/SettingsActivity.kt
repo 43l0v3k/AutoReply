@@ -2,6 +2,7 @@ package com.example.autoreply
 
 import android.Manifest
 import android.app.Activity
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -21,6 +22,12 @@ class SettingsActivity : Activity() {
     private lateinit var callDelayInput: EditText
     private lateinit var callTextInput: EditText
     private lateinit var audioStatus: TextView
+    private lateinit var stopInput: EditText
+    private lateinit var blackInput: EditText
+    private lateinit var whiteInput: EditText
+    private lateinit var timerInput: EditText
+    private lateinit var startBtn: Button
+    private lateinit var endBtn: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -120,12 +127,74 @@ class SettingsActivity : Activity() {
             updateAudioStatus()
         }
 
+        // --- фильтры, расписание, таймер (v1.2.0) ---
+        fun multiLine(value: String) = EditText(this).apply {
+            setText(value)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        }
+
+        root.addView(TextView(this).apply { text = "Стоп-слова"; setPadding(0, pad, 0, 0) })
+        stopInput = multiLine(prefs.stopWords)
+        root.addView(stopInput)
+        root.addView(hint("Если в сообщении есть одно из слов, автоответ не отправляется. Через запятую или с новой строки."))
+
+        root.addView(TextView(this).apply { text = "Чёрный список имён" })
+        blackInput = multiLine(prefs.blacklist)
+        root.addView(blackInput)
+        root.addView(hint("Этим людям не отвечать. Достаточно части имени из уведомления."))
+
+        root.addView(TextView(this).apply { text = "Белый список имён" })
+        whiteInput = multiLine(prefs.whitelist)
+        root.addView(whiteInput)
+        root.addView(hint("Если список не пуст, отвечать только этим людям. Чёрный список важнее белого."))
+
+        root.addView(Switch(this).apply {
+            text = "Отвечать только по расписанию"
+            isChecked = prefs.scheduleOn
+            setOnCheckedChangeListener { _, c -> prefs.scheduleOn = c }
+        })
+        startBtn = Button(this).apply {
+            isAllCaps = false
+            setOnClickListener {
+                TimePickerDialog(this@SettingsActivity, { _, h, m ->
+                    prefs.scheduleStart = h * 60 + m
+                    updateScheduleButtons()
+                }, prefs.scheduleStart / 60, prefs.scheduleStart % 60, true).show()
+            }
+        }
+        endBtn = Button(this).apply {
+            isAllCaps = false
+            setOnClickListener {
+                TimePickerDialog(this@SettingsActivity, { _, h, m ->
+                    prefs.scheduleEnd = h * 60 + m
+                    updateScheduleButtons()
+                }, prefs.scheduleEnd / 60, prefs.scheduleEnd % 60, true).show()
+            }
+        }
+        root.addView(startBtn)
+        root.addView(endBtn)
+        updateScheduleButtons()
+        root.addView(hint("Вне этого окна автоответ молчит, даже если включён. Окно может идти через полночь."))
+
+        root.addView(TextView(this).apply { text = "Таймер (минут)" })
+        timerInput = EditText(this).apply {
+            setText(prefs.timerMin.toString())
+            inputType = InputType.TYPE_CLASS_NUMBER
+        }
+        root.addView(timerInput)
+        root.addView(hint("Автоответчик сам выключится через столько минут после включения. 0 - без таймера. Срабатывает с небольшой погрешностью."))
+
         root.addView(hint("Плитка: потяни шторку, нажми карандаш и перетащи AutoReply. Виджет: долгое нажатие на рабочий стол, Виджеты, AutoReply."))
 
         setContentView(ScrollView(this).apply {
             fitsSystemWindows = true
             addView(root)
         })
+    }
+
+    private fun updateScheduleButtons() {
+        startBtn.text = "Начало: ${Prefs.fmtTime(prefs.scheduleStart)}"
+        endBtn.text = "Конец: ${Prefs.fmtTime(prefs.scheduleEnd)}"
     }
 
     private fun updateAudioStatus() {
@@ -162,6 +231,10 @@ class SettingsActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        prefs.stopWords = stopInput.text.toString()
+        prefs.blacklist = blackInput.text.toString()
+        prefs.whitelist = whiteInput.text.toString()
+        prefs.timerMin = timerInput.text.toString().toIntOrNull()?.coerceIn(0, 1440) ?: 0
         if (!CallHandler.supported()) return
         prefs.callText = callTextInput.text.toString().ifBlank { Prefs.DEFAULT_CALL_TEXT }
         prefs.callDelaySec = callDelayInput.text.toString().toIntOrNull()?.coerceIn(0, 60) ?: 10

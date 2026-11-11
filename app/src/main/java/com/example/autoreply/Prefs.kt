@@ -38,6 +38,67 @@ class Prefs(context: Context) {
     var showNotification: Boolean
         get() = sp.getBoolean("show_notification", true)
         set(v) = sp.edit().putBoolean("show_notification", v).apply()
+    // --- v1.2.0: фильтры, расписание, таймер ---
+
+    // списки хранятся строкой: слова через запятую или с новой строки
+    var stopWords: String
+        get() = sp.getString("stop_words", "") ?: ""
+        set(v) = sp.edit().putString("stop_words", v).apply()
+
+    var blacklist: String
+        get() = sp.getString("blacklist", "") ?: ""
+        set(v) = sp.edit().putString("blacklist", v).apply()
+
+    var whitelist: String
+        get() = sp.getString("whitelist", "") ?: ""
+        set(v) = sp.edit().putString("whitelist", v).apply()
+
+    // расписание: отвечать только в окне [start, end), минуты с полуночи
+    var scheduleOn: Boolean
+        get() = sp.getBoolean("schedule_on", false)
+        set(v) = sp.edit().putBoolean("schedule_on", v).apply()
+
+    var scheduleStart: Int
+        get() = sp.getInt("schedule_start", 22 * 60)
+        set(v) = sp.edit().putInt("schedule_start", v).apply()
+
+    var scheduleEnd: Int
+        get() = sp.getInt("schedule_end", 8 * 60)
+        set(v) = sp.edit().putInt("schedule_end", v).apply()
+
+    // таймер: выключить автоответчик через N минут после включения (0 - без таймера)
+    var timerMin: Int
+        get() = sp.getInt("timer_min", 0)
+        set(v) = sp.edit().putInt("timer_min", v).apply()
+
+    private fun parseList(s: String) =
+        s.split(',', '\n', ';').map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+
+    fun inSchedule(nowMin: Int = nowMinutes()): Boolean {
+        if (!scheduleOn) return true
+        val s = scheduleStart
+        val e = scheduleEnd
+        return when {
+            s == e -> true
+            s < e -> nowMin in s until e
+            else -> nowMin >= s || nowMin < e // окно через полночь
+        }
+    }
+
+    fun hasStopWord(text: String?): Boolean {
+        if (text.isNullOrEmpty()) return false
+        val t = text.lowercase()
+        return parseList(stopWords).any { t.contains(it) }
+    }
+
+    // чёрный список важнее белого; если белый список не пуст, отвечаем только ему
+    fun nameAllowed(name: String): Boolean {
+        val n = name.lowercase()
+        if (parseList(blacklist).any { n.contains(it) }) return false
+        val white = parseList(whitelist)
+        return white.isEmpty() || white.any { n.contains(it) }
+    }
+
     // звонки: автоответ голосом (Android 9+)
     var callAnswer: Boolean
         get() = sp.getBoolean("call_answer", false)
@@ -97,6 +158,13 @@ class Prefs(context: Context) {
             "Сейчас занят(а), напишу позже. (автоответ)",
             "Сплю, отвечу утром. (автоответ)"
         )
+
+        fun nowMinutes(): Int {
+            val c = java.util.Calendar.getInstance()
+            return c.get(java.util.Calendar.HOUR_OF_DAY) * 60 + c.get(java.util.Calendar.MINUTE)
+        }
+
+        fun fmtTime(min: Int) = "%02d:%02d".format(min / 60, min % 60)
 
         fun describe(line: String): String {
             val p = line.split("\t")

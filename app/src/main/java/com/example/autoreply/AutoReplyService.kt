@@ -64,6 +64,11 @@ class AutoReplyService : NotificationListenerService() {
         // не отвечаем на собственный автоответ
         if (text != null && text.contains(prefs.replyText)) return
 
+        // v1.2.0: расписание, стоп-слова, чёрный и белый списки
+        if (!prefs.inSchedule()) return
+        if (prefs.hasStopWord(text)) return
+        if (!prefs.nameAllowed(title)) return
+
         val action = findReplyAction(n) ?: return
 
         val key = "${sbn.packageName}:$title"
