@@ -73,5 +73,9 @@
             android:name=".ToggleReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".TimerOffReceiver"
+            android:exported="false" />
+
     </application>
 </manifest>
