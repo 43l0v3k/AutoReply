@@ -15,6 +15,7 @@ class AutoReplyService : NotificationListenerService() {
 
     override fun onListenerConnected() {
         instance = this
+        CallHandler.start(this)
         Notifier.update(this)
     }
 

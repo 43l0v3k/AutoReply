@@ -38,6 +38,25 @@ class Prefs(context: Context) {
     var showNotification: Boolean
         get() = sp.getBoolean("show_notification", true)
         set(v) = sp.edit().putBoolean("show_notification", v).apply()
+    // звонки: автоответ голосом (Android 9+)
+    var callAnswer: Boolean
+        get() = sp.getBoolean("call_answer", false)
+        set(v) = sp.edit().putBoolean("call_answer", v).apply()
+
+    // через сколько секунд брать трубку
+    var callDelaySec: Int
+        get() = sp.getInt("call_delay", 10)
+        set(v) = sp.edit().putInt("call_delay", v).apply()
+
+    var callText: String
+        get() = sp.getString("call_text", DEFAULT_CALL_TEXT) ?: DEFAULT_CALL_TEXT
+        set(v) = sp.edit().putString("call_text", v).apply()
+
+    // своя запись приветствия (uri аудиофайла), иначе читает синтезатор речи
+    var callAudioUri: String?
+        get() = sp.getString("call_audio", null)
+        set(v) = sp.edit().putString("call_audio", v).apply()
+
     // приложения
     private var disabledApps: Set<String>
         get() = sp.getStringSet("disabled_apps", emptySet()) ?: emptySet()
@@ -70,6 +89,7 @@ class Prefs(context: Context) {
 
     companion object {
         const val DEFAULT_TEXT = "Привет! Сейчас не могу ответить, напишу позже. (автоответ)"
+        const val DEFAULT_CALL_TEXT = "Здравствуйте. Абонент сейчас не может ответить. Напишите ему в мессенджер, он ответит позже."
         const val TEMPLATE_COUNT = 4
         val DEFAULT_TEMPLATES = listOf(
             DEFAULT_TEXT,
