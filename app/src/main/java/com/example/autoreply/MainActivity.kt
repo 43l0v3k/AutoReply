@@ -171,6 +171,8 @@ class MainActivity : Activity() {
             ?.contains(packageName) == true
         status.text = if (granted) "Доступ к уведомлениям: есть" else "Доступ к уведомлениям: нет, выдай"
         if (mainSwitch.isChecked != prefs.enabled) mainSwitch.isChecked = prefs.enabled
+        // запускаем слежение за звонками и без доступа к уведомлениям
+        if (prefs.callAnswer) CallHandler.start(this)
         Notifier.update(this)
     }
 

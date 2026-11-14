@@ -113,6 +113,11 @@ class Prefs(context: Context) {
         get() = sp.getString("call_text", DEFAULT_CALL_TEXT) ?: DEFAULT_CALL_TEXT
         set(v) = sp.edit().putString("call_text", v).apply()
 
+    // последние события обработки звонков (для диагностики в настройках)
+    var callDebug: String
+        get() = sp.getString("call_debug", "") ?: ""
+        set(v) = sp.edit().putString("call_debug", v).apply()
+
     // своя запись приветствия (uri аудиофайла), иначе читает синтезатор речи
     var callAudioUri: String?
         get() = sp.getString("call_audio", null)

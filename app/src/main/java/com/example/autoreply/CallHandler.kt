@@ -44,6 +44,20 @@ object CallHandler {
 
     fun supported() = Build.VERSION.SDK_INT >= 28
 
+    fun isListening() = started
+
+    // короткий журнал последних событий, виден в настройках
+    private fun log(msg: String) {
+        try {
+            val p = Prefs(app)
+            val line = "${Prefs.fmtTime(Prefs.nowMinutes())} $msg"
+            p.callDebug = (listOf(line) + p.callDebug.split("\n").filter { it.isNotBlank() })
+                .take(8).joinToString("\n")
+        } catch (e: Exception) {
+            Log.e(TAG, "log failed", e)
+        }
+    }
+
     fun hasPermissions(ctx: Context) =
         ctx.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED &&
             ctx.checkSelfPermission(Manifest.permission.ANSWER_PHONE_CALLS) == PackageManager.PERMISSION_GRANTED
@@ -66,8 +80,10 @@ object CallHandler {
                 }, PhoneStateListener.LISTEN_CALL_STATE)
             }
             started = true
+            log("слушаю состояние телефона")
         } catch (e: Exception) {
             Log.e(TAG, "listen failed", e)
+            log("не удалось начать слушать: ${e.message}")
         }
     }
 
@@ -79,6 +95,13 @@ object CallHandler {
     private fun onState(state: Int) {
         val prev = lastState
         lastState = state
+        log(
+            when (state) {
+                TelephonyManager.CALL_STATE_RINGING -> "телефон звонит"
+                TelephonyManager.CALL_STATE_OFFHOOK -> "трубка снята"
+                else -> "звонок завершён"
+            }
+        )
         when (state) {
             TelephonyManager.CALL_STATE_RINGING -> if (prev == TelephonyManager.CALL_STATE_IDLE) scheduleAnswer()
             TelephonyManager.CALL_STATE_OFFHOOK -> {
@@ -97,7 +120,15 @@ object CallHandler {
 
     private fun scheduleAnswer() {
         val prefs = Prefs(app)
-        if (!prefs.enabled || !prefs.callAnswer) return
+        if (!prefs.enabled) {
+            log("пропуск: AutoReply выключен")
+            return
+        }
+        if (!prefs.callAnswer) {
+            log("пропуск: «Отвечать на звонки» выключено")
+            return
+        }
+        log("возьму трубку через ${prefs.callDelaySec} с")
         cancelPending()
         val r = Runnable {
             pendingAnswer = null
@@ -113,19 +144,29 @@ object CallHandler {
     }
 
     private fun answer() {
-        if (lastState != TelephonyManager.CALL_STATE_RINGING || !hasPermissions(app)) return
+        if (lastState != TelephonyManager.CALL_STATE_RINGING) {
+            log("звонок уже не звонит, трубку не беру")
+            return
+        }
+        if (!hasPermissions(app)) {
+            log("нет разрешений на звонки")
+            return
+        }
         try {
+            log("беру трубку")
             answering = true
             app.getSystemService(TelecomManager::class.java).acceptRingingCall()
         } catch (e: Exception) {
             answering = false
             Log.e(TAG, "answer failed", e)
+            log("не удалось взять трубку: ${e.message}")
         }
     }
 
     private fun play() {
         if (!handling) return
         val prefs = Prefs(app)
+        log("играю приветствие")
         prefs.count = prefs.count + 1
         prefs.addJournal("Звонок", "входящий")
         Notifier.update(app)
@@ -177,6 +218,7 @@ object CallHandler {
         tts = TextToSpeech(app) { status ->
             val engine = tts
             if (status != TextToSpeech.SUCCESS || engine == null) {
+                log("синтезатор речи не запустился, сбрасываю")
                 done()
                 return@TextToSpeech
             }

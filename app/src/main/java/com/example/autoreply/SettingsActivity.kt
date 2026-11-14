@@ -22,6 +22,7 @@ class SettingsActivity : Activity() {
     private lateinit var callDelayInput: EditText
     private lateinit var callTextInput: EditText
     private lateinit var audioStatus: TextView
+    private lateinit var callStatus: TextView
     private lateinit var stopInput: EditText
     private lateinit var blackInput: EditText
     private lateinit var whiteInput: EditText
@@ -125,6 +126,14 @@ class SettingsActivity : Activity() {
             })
             root.addView(hint("Если запись выбрана, проигрывается она, а текст не используется."))
             updateAudioStatus()
+
+            root.addView(TextView(this).apply { text = "Проверка звонков" })
+            callStatus = TextView(this).apply {
+                textSize = 12f
+                setTextColor(Color.GRAY)
+                setPadding(0, 0, 0, pad)
+            }
+            root.addView(callStatus)
         }
 
         // --- фильтры, расписание, таймер (v1.2.0) ---
@@ -190,6 +199,25 @@ class SettingsActivity : Activity() {
             fitsSystemWindows = true
             addView(root)
         })
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!CallHandler.supported()) return
+        if (!CallHandler.isListening()) CallHandler.start(this)
+        updateCallStatus()
+    }
+
+    private fun updateCallStatus() {
+        val head = listOf(
+            "Разрешения на звонки: " + if (CallHandler.hasPermissions(this)) "есть" else "НЕТ",
+            "AutoReply включён: " + if (prefs.enabled) "да" else "НЕТ",
+            "Слежу за звонками: " + if (CallHandler.isListening()) "да" else "НЕТ",
+            "Последние события:"
+        )
+        val events = prefs.callDebug.split("\n").filter { it.isNotBlank() }
+            .ifEmpty { listOf("пока пусто") }
+        callStatus.text = (head + events).joinToString("\n")
     }
 
     private fun updateScheduleButtons() {
