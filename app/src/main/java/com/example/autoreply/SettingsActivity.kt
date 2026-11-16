@@ -4,10 +4,8 @@ import android.Manifest
 import android.app.Activity
 import android.app.TimePickerDialog
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.text.InputType
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -27,178 +25,143 @@ class SettingsActivity : Activity() {
     private lateinit var blackInput: EditText
     private lateinit var whiteInput: EditText
     private lateinit var timerInput: EditText
-    private lateinit var startBtn: Button
-    private lateinit var endBtn: Button
+    private lateinit var startBtn: TextView
+    private lateinit var endBtn: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
-        val pad = (16 * resources.displayMetrics.density).toInt()
+        val ui = Ui(this)
+        val col = ui.page(this, "Настройки", back = true)
 
-        fun hint(s: String) = TextView(this).apply {
-            text = s
-            textSize = 12f
-            setTextColor(Color.GRAY)
-            setPadding(0, 0, 0, pad)
-        }
+        fun title(s: String) = col.addView(ui.section(s), ui.lp(top = 24, bottom = 8))
+        fun label(s: String) = ui.tv(s, 14f, ui.fg, true).apply { setPadding(0, ui.dp(14), 0, ui.dp(8)) }
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(pad, pad, pad, pad)
-        }
-
-        root.addView(Switch(this).apply {
-            text = "Связать с «Не беспокоить»"
-            isChecked = prefs.dndLink
-            setOnCheckedChangeListener { _, c -> prefs.dndLink = c }
-        })
-        root.addView(hint("Включился режим «Не беспокоить» - включается AutoReply, и наоборот."))
-
-        root.addView(Switch(this).apply {
-            text = "Уведомление «AutoReply активен»"
-            isChecked = prefs.showNotification
-            setOnCheckedChangeListener { _, c ->
-                prefs.showNotification = c
-                Notifier.update(this@SettingsActivity)
-            }
-        })
-        root.addView(hint("Постоянное уведомление со счётчиком ответов."))
+        // --- общее ---
+        title("Общее")
+        col.addView(ui.card(
+            ui.toggle("Связать с «Не беспокоить»", "Включился режим — включился AutoReply, и наоборот", prefs.dndLink) {
+                prefs.dndLink = it
+            }.view,
+            ui.divider(),
+            ui.toggle("Уведомление «AutoReply активен»", "Постоянное уведомление со счётчиком ответов", prefs.showNotification) {
+                prefs.showNotification = it
+                Notifier.update(this)
+            }.view
+        ))
 
         // --- звонки ---
         if (CallHandler.supported()) {
-            callSwitch = Switch(this).apply {
-                text = "Отвечать на звонки"
-                isChecked = prefs.callAnswer && CallHandler.hasPermissions(this@SettingsActivity)
-                setOnCheckedChangeListener { _, c ->
-                    if (c && !CallHandler.hasPermissions(this@SettingsActivity)) {
-                        requestPermissions(
-                            arrayOf(Manifest.permission.READ_PHONE_STATE, Manifest.permission.ANSWER_PHONE_CALLS),
-                            REQ_CALLS
-                        )
-                    } else {
-                        prefs.callAnswer = c
-                        if (c) CallHandler.start(this@SettingsActivity)
-                    }
+            title("Звонки")
+            val row = ui.toggle(
+                "Отвечать на звонки",
+                "Через несколько секунд берёт трубку, проигрывает приветствие и сбрасывает",
+                prefs.callAnswer && CallHandler.hasPermissions(this)
+            ) { c ->
+                if (c && !CallHandler.hasPermissions(this)) {
+                    requestPermissions(
+                        arrayOf(Manifest.permission.READ_PHONE_STATE, Manifest.permission.ANSWER_PHONE_CALLS),
+                        REQ_CALLS
+                    )
+                } else {
+                    prefs.callAnswer = c
+                    if (c) CallHandler.start(this)
                 }
             }
-            root.addView(callSwitch)
-            root.addView(hint(
-                "Когда AutoReply включён и тебе звонят, приложение через несколько секунд берёт трубку, " +
-                    "проигрывает приветствие и сбрасывает. Звонящий слышит его через динамик телефона, " +
-                    "качество зависит от модели. Выбор цифр («нажмите 1») Android приложениям недоступен."
+            callSwitch = row.sw
+            col.addView(ui.card(row.view))
+            col.addView(ui.hint(
+                "Звонящий слышит приветствие через динамик телефона, качество зависит от модели. " +
+                    "Выбор цифр («нажмите 1») Android приложениям недоступен."
             ))
 
-            root.addView(TextView(this).apply { text = "Взять трубку через (секунд)" })
-            callDelayInput = EditText(this).apply {
-                setText(prefs.callDelaySec.toString())
-                inputType = InputType.TYPE_CLASS_NUMBER
-            }
-            root.addView(callDelayInput)
-            root.addView(hint("Эти секунды телефон звонит как обычно, можно успеть ответить самому."))
-
-            root.addView(TextView(this).apply { text = "Текст приветствия (его читает синтезатор речи)" })
-            callTextInput = EditText(this).apply {
-                setText(prefs.callText)
-                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-            }
-            root.addView(callTextInput)
-
-            audioStatus = TextView(this).apply { setPadding(0, pad, 0, 0) }
-            root.addView(audioStatus)
-            root.addView(Button(this).apply {
-                text = "Выбрать свою запись"
-                isAllCaps = false
-                setOnClickListener {
+            callDelayInput = ui.input(prefs.callDelaySec.toString(), number = true)
+            callTextInput = ui.input(prefs.callText, multiline = true)
+            audioStatus = ui.tv("", 13.5f, ui.dim).apply { setPadding(0, ui.dp(10), 0, ui.dp(10)) }
+            val audioButtons = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(ui.button("Своя запись") {
                     val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "audio/*"
                     }
                     startActivityForResult(i, REQ_AUDIO)
-                }
-            })
-            root.addView(Button(this).apply {
-                text = "Убрать запись (читать текст)"
-                isAllCaps = false
-                setOnClickListener {
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = ui.dp(6) })
+                addView(ui.button("Убрать запись") {
                     prefs.callAudioUri = null
                     updateAudioStatus()
-                }
-            })
-            root.addView(hint("Если запись выбрана, проигрывается она, а текст не используется."))
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { leftMargin = ui.dp(6) })
+            }
+            callStatus = ui.tv("", 12f, ui.dim).apply { setLineSpacing(0f, 1.15f) }
+
+            col.addView(ui.card(
+                label("Взять трубку через (секунд)").apply { setPadding(0, 0, 0, ui.dp(8)) },
+                callDelayInput,
+                ui.hint("Эти секунды телефон звонит как обычно, можно успеть ответить самому."),
+                label("Текст приветствия (читает синтезатор речи)"),
+                callTextInput,
+                audioStatus,
+                audioButtons,
+                ui.hint("Если запись выбрана, проигрывается она, а текст не используется.")
+            ), ui.lp(top = 12))
             updateAudioStatus()
 
-            root.addView(TextView(this).apply { text = "Проверка звонков" })
-            callStatus = TextView(this).apply {
-                textSize = 12f
-                setTextColor(Color.GRAY)
-                setPadding(0, 0, 0, pad)
-            }
-            root.addView(callStatus)
+            col.addView(ui.card(label("Проверка звонков").apply { setPadding(0, 0, 0, ui.dp(8)) }, callStatus), ui.lp(top = 12))
         }
 
-        // --- фильтры, расписание, таймер (v1.2.0) ---
-        fun multiLine(value: String) = EditText(this).apply {
-            setText(value)
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        // --- фильтры ---
+        title("Фильтры")
+        stopInput = ui.input(prefs.stopWords, multiline = true)
+        blackInput = ui.input(prefs.blacklist, multiline = true)
+        whiteInput = ui.input(prefs.whitelist, multiline = true)
+        col.addView(ui.card(
+            label("Стоп-слова").apply { setPadding(0, 0, 0, ui.dp(8)) },
+            stopInput,
+            ui.hint("Если в сообщении есть одно из слов, автоответ не отправляется. Через запятую или с новой строки."),
+            label("Чёрный список имён"),
+            blackInput,
+            ui.hint("Этим людям не отвечать. Достаточно части имени из уведомления."),
+            label("Белый список имён"),
+            whiteInput,
+            ui.hint("Если список не пуст, отвечать только этим людям. Чёрный список важнее белого.")
+        ))
+
+        // --- расписание ---
+        title("Расписание")
+        startBtn = ui.button("") {
+            TimePickerDialog(this, { _, h, m ->
+                prefs.scheduleStart = h * 60 + m
+                updateScheduleButtons()
+            }, prefs.scheduleStart / 60, prefs.scheduleStart % 60, true).show()
         }
-
-        root.addView(TextView(this).apply { text = "Стоп-слова"; setPadding(0, pad, 0, 0) })
-        stopInput = multiLine(prefs.stopWords)
-        root.addView(stopInput)
-        root.addView(hint("Если в сообщении есть одно из слов, автоответ не отправляется. Через запятую или с новой строки."))
-
-        root.addView(TextView(this).apply { text = "Чёрный список имён" })
-        blackInput = multiLine(prefs.blacklist)
-        root.addView(blackInput)
-        root.addView(hint("Этим людям не отвечать. Достаточно части имени из уведомления."))
-
-        root.addView(TextView(this).apply { text = "Белый список имён" })
-        whiteInput = multiLine(prefs.whitelist)
-        root.addView(whiteInput)
-        root.addView(hint("Если список не пуст, отвечать только этим людям. Чёрный список важнее белого."))
-
-        root.addView(Switch(this).apply {
-            text = "Отвечать только по расписанию"
-            isChecked = prefs.scheduleOn
-            setOnCheckedChangeListener { _, c -> prefs.scheduleOn = c }
-        })
-        startBtn = Button(this).apply {
-            isAllCaps = false
-            setOnClickListener {
-                TimePickerDialog(this@SettingsActivity, { _, h, m ->
-                    prefs.scheduleStart = h * 60 + m
-                    updateScheduleButtons()
-                }, prefs.scheduleStart / 60, prefs.scheduleStart % 60, true).show()
-            }
+        endBtn = ui.button("") {
+            TimePickerDialog(this, { _, h, m ->
+                prefs.scheduleEnd = h * 60 + m
+                updateScheduleButtons()
+            }, prefs.scheduleEnd / 60, prefs.scheduleEnd % 60, true).show()
         }
-        endBtn = Button(this).apply {
-            isAllCaps = false
-            setOnClickListener {
-                TimePickerDialog(this@SettingsActivity, { _, h, m ->
-                    prefs.scheduleEnd = h * 60 + m
-                    updateScheduleButtons()
-                }, prefs.scheduleEnd / 60, prefs.scheduleEnd % 60, true).show()
-            }
+        val times = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(startBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = ui.dp(6) })
+            addView(endBtn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { leftMargin = ui.dp(6) })
         }
-        root.addView(startBtn)
-        root.addView(endBtn)
+        col.addView(ui.card(
+            ui.toggle("Отвечать только по расписанию", null, prefs.scheduleOn) { prefs.scheduleOn = it }.view,
+            times.apply { layoutParams = ui.lp(top = 14) }
+        ))
         updateScheduleButtons()
-        root.addView(hint("Вне этого окна автоответ молчит, даже если включён. Окно может идти через полночь."))
+        col.addView(ui.hint("Вне этого окна автоответ молчит, даже если включён. Окно может идти через полночь."))
 
-        root.addView(TextView(this).apply { text = "Таймер (минут)" })
-        timerInput = EditText(this).apply {
-            setText(prefs.timerMin.toString())
-            inputType = InputType.TYPE_CLASS_NUMBER
-        }
-        root.addView(timerInput)
-        root.addView(hint("Автоответчик сам выключится через столько минут после включения. 0 - без таймера. Срабатывает с небольшой погрешностью."))
+        // --- таймер ---
+        title("Таймер")
+        timerInput = ui.input(prefs.timerMin.toString(), number = true)
+        col.addView(ui.card(
+            label("Выключить через (минут)").apply { setPadding(0, 0, 0, ui.dp(8)) },
+            timerInput,
+            ui.hint("Автоответчик сам выключится через столько минут после включения. 0 — без таймера. Срабатывает с небольшой погрешностью.")
+        ))
 
-        root.addView(hint("Плитка: потяни шторку, нажми карандаш и перетащи AutoReply. Виджет: долгое нажатие на рабочий стол, Виджеты, AutoReply."))
-
-        setContentView(ScrollView(this).apply {
-            fitsSystemWindows = true
-            addView(root)
-        })
+        col.addView(ui.hint("Плитка: потяни шторку, нажми карандаш и перетащи AutoReply. Виджет: долгое нажатие на рабочий стол, Виджеты, AutoReply."), ui.lp(top = 16))
     }
 
     override fun onResume() {
