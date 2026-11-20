@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
@@ -52,7 +53,7 @@ object CallHandler {
             val p = Prefs(app)
             val line = "${Prefs.fmtTime(Prefs.nowMinutes())} $msg"
             p.callDebug = (listOf(line) + p.callDebug.split("\n").filter { it.isNotBlank() })
-                .take(8).joinToString("\n")
+                .take(12).joinToString("\n")
         } catch (e: Exception) {
             Log.e(TAG, "log failed", e)
         }
@@ -174,11 +175,22 @@ object CallHandler {
 
         val am = app.getSystemService(AudioManager::class.java)
         try {
+            @Suppress("DEPRECATION")
             speakerWasOn = am.isSpeakerphoneOn
+            // Android 12+: динамик включается через communication device
+            if (Build.VERSION.SDK_INT >= 31) {
+                am.availableCommunicationDevices
+                    .firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                    ?.let { am.setCommunicationDevice(it) }
+            }
             @Suppress("DEPRECATION")
             am.isSpeakerphoneOn = true
             am.setStreamVolume(AudioManager.STREAM_VOICE_CALL, am.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL), 0)
+            @Suppress("DEPRECATION")
+            val speakerOn = am.isSpeakerphoneOn
+            log("динамик: " + (if (speakerOn) "включён" else "НЕ включился, Android не дал") + ", режим аудио ${am.mode}")
         } catch (e: Exception) {
+            log("ошибка звука: ${e.message}")
             Log.e(TAG, "speaker failed", e)
         }
 
@@ -225,10 +237,15 @@ object CallHandler {
             engine.language = Locale("ru")
             engine.setAudioAttributes(attrs())
             engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) {}
+                override fun onStart(utteranceId: String?) { main.post { log("синтезатор говорит") } }
                 override fun onDone(utteranceId: String?) { main.post { done() } }
                 @Deprecated("Deprecated in Java")
-                override fun onError(utteranceId: String?) { main.post { done() } }
+                override fun onError(utteranceId: String?) {
+                    main.post {
+                        log("ошибка синтезатора")
+                        done()
+                    }
+                }
             })
             engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "greeting")
         }
@@ -260,6 +277,7 @@ object CallHandler {
         if (handling) {
             try {
                 val am = app.getSystemService(AudioManager::class.java)
+                if (Build.VERSION.SDK_INT >= 31) am.clearCommunicationDevice()
                 @Suppress("DEPRECATION")
                 am.isSpeakerphoneOn = speakerWasOn
             } catch (e: Exception) {

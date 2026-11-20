@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- для тематических иконок Android 13+: пузырь со стрелкой, вырезанной внутри -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M36,32 H72 A6,6 0 0 1 78,38 V58 A6,6 0 0 1 72,64 H50 L38,76 V64 H36 A6,6 0 0 1 30,58 V38 A6,6 0 0 1 36,32 Z M43,48 L52,40 V45 C59,45 64,48 66,56 C62,52 58,51 52,51 V56 Z" />
+</vector>
